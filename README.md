@@ -9,7 +9,7 @@ This is in progress
 
 Make sure the `ffmpeg` and `realesrgan-ncnn-vulkan` commands are available.
 
-'''shell
+```shell
 pip install -r requirements.txt
 python upscale.py upscale -i test_out/ -o test_upscale/ -f jpg -s 2
-'''
+```
