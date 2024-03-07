@@ -106,6 +106,53 @@ def upscale(src: str, dst: str, fmt: str, gpu: str = 'auto',
     print("Done")
 
 
+def package_video(src: str, dst: str, source: str = "", metadata: str = ""):
+    ffmpeg = (
+        FFmpeg()
+        .option("y")
+        .input(src)
+    )
+    index = 0
+    arguments = {
+        'codec:v': 'libx265',
+        'hwaccel': 'cuda',
+        # 'codec:v': 'hevc_vaapi',
+        # 'codec:v': 'hevc_amf',
+        'max_interleave_delta': '0',
+        # 'pix_fmt': 'yuv420p',
+        'pix_fmt': 'yuv420p10le',
+        'crf': 18,
+        'preset': 'veryslow',
+        'x265-params': 'profile=main10',
+        'r': '23.98'
+    }
+    map = ["0:v"]
+    if source:
+        print(f"Adding source: {source}")
+        ffmpeg.input(source)
+        index += 1
+        map.append(f"{index}:a")
+        map.append(f"{index}:s")
+        arguments['codec:a'] = 'copy'
+        arguments['codec:s'] = 'copy'
+    if metadata:
+        print(f"Adding metadata: {metadata}")
+        ffmpeg.input(metadata)
+        index += 1
+        arguments['map_metadata'] = f"{index}"
+        arguments['map_chapters'] = index
+    ffmpeg.output(
+        dst,
+        arguments,
+        map=map
+    )
+
+    ffmpeg.on("progress", on_progress)
+    ffmpeg.on("completed", on_completed)
+
+    ffmpeg.execute()
+
+
 def main():
     parser = argparse.ArgumentParser(prog='upscale',
                                      description="Upscale multiple files")
@@ -121,6 +168,9 @@ def main():
                         help='upscale ratio (can be 2, 3, 4. default=4)')
     parser.add_argument('-n', '--model-name', default='realesr-animevideov3',
                         help="model name (default=realesr-animevideov3, can be realesr-animevideov3 | realesrgan-x4plus | realesrgan-x4plus-anime | realesrnet-x4plus)")
+    parser.add_argument('-S', '--source',
+                        help="Source to fetch audio and subtitles from")
+    parser.add_argument('-M', '--metadata', help="Path to files with metadata")
     args = parser.parse_args()
     if args.format not in ["png", "jpg", "jpeg"]:
         print(f"Format {args.format} is not a valid output format")
@@ -146,6 +196,24 @@ def main():
                     dest_folder = f"{dest_folder}/"
                 upscale(src_folder, dest_folder, args.format,
                         gpu=args.gpu, scale=args.scale, model=args.model_name)
+        case "package":
+            entries = os.listdir(args.input)
+            for entry in entries:
+                src_folder = os.path.join(args.input, entry,
+                                          f'frame%08d.{args.format}')
+                dest_file = os.path.join(args.output, f"{entry}.mkv")
+                source = ""
+                if args.source:
+                    temp = os.path.join(args.source, f"{entry}.mkv")
+                    if os.path.isfile(temp):
+                        source = temp
+                metadata = ""
+                if args.metadata:
+                    temp = os.path.join(args.metadata, f"{entry}.txt")
+                    if os.path.isfile(temp):
+                        metadata = temp
+                package_video(src_folder, dest_file, source=source,
+                              metadata=metadata)
         case "bulk":
             print("Run bulk action")
         case "test":
