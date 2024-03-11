@@ -103,6 +103,7 @@ def main():
                                      description="Upscale multiple files")
     parser.add_argument('-i', '--input', help="Source folder for the command")
     parser.add_argument('-o', '--output', help="Output folder for the command")
+    parser.add_argument('--skip', action='store_true', help="Skip encode if output video exists")
     args = parser.parse_args()
 
     entries = os.listdir(args.input)
@@ -111,6 +112,9 @@ def main():
         dst = os.path.join(args.output, os.path.splitext(entry)[0] + '.mp4')
         print(f"Input: {src}")
         print(f"Output: {dst}")
+        if args.skip and os.path.exists(dst):
+            print("Output already exists, skipping...\n")
+            continue
         metadata = query_metadata(src)
         print(f"Source:\n\tDuration: {metadata['streams'][0]['duration']}\n\tResolution: {metadata['streams'][0]['width']}x{metadata['streams'][0]['height']}")
         datetime_start = datetime.now()
